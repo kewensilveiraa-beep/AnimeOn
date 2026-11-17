@@ -7,9 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['animeon-logo.png'],
       manifest: {
-        name: 'AnimeOn - Catálogo e Rastreador de Animes',
+        name: 'AnimeOn',
         short_name: 'AnimeOn',
         description: 'Descubra lançamentos, acompanhe episódios e organize sua lista de animes.',
         theme_color: '#070709',
@@ -19,9 +19,15 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: '/animeon-logo.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/animeon-logo.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any maskable',
           },
         ],
