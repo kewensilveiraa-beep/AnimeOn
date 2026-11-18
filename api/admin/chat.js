@@ -1,0 +1,132 @@
+import {
+  createAdminSupabase,
+  createFinanceMovement,
+  getRequestBody,
+  logApiError,
+  normalizeFinanceMovement,
+  readDashboardMetrics,
+  requireAdmin,
+  sendJson,
+} from '../_lib/admin.js';
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function parseFinanceCommand(message) {
+  const match = message.match(/^\s*registrar\s+(receita|gasto|despesa)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(.*)$/i);
+  if (!match) return null;
+  const tipo = match[1].toLowerCase() === 'receita' ? 'receita' : 'despesa';
+  const valor = Number(match[2].replace(',', '.'));
+  const descricao = match[3].trim() || (tipo === 'receita' ? 'Receita registrada pelo chat' : 'Despesa registrada pelo chat');
+  return normalizeFinanceMovement({ tipo, valor, descricao });
+}
+
+function normalizeQuestion(value) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function makeAnswer(message, metrics, averageCommission) {
+  const question = normalizeQuestion(message);
+  const clicks = toNumber(metrics.totalClicks);
+  const tiktokClicks = toNumber(metrics.tiktokClicks);
+  const revenue = toNumber(metrics.revenue);
+  const costs = toNumber(metrics.costs);
+  const profit = revenue - costs;
+  const roi = costs > 0 ? (profit / costs) * 100 : null;
+  const epc = clicks > 0 ? revenue / clicks : 0;
+
+  if (question.includes('roi')) {
+    return roi === null
+      ? 'Ainda não há custos lançados para calcular o ROI. Registre seus investimentos no painel financeiro.'
+      : `O ROI atual é ${roi.toFixed(1)}%. Receita: ${formatCurrency(revenue)}; custos: ${formatCurrency(costs)}; lucro líquido: ${formatCurrency(profit)}.`;
+  }
+
+  if (question.includes('convers') || question.includes('taxa')) {
+    if (revenue <= 0) return 'Aguardando vendas: ainda não há receitas financeiras lançadas para estimar a conversão.';
+    if (averageCommission <= 0) return 'Informe uma comissão média por venda no painel para calcular a taxa estimada.';
+    if (clicks === 0) return 'Ainda não há cliques registrados para estimar a taxa de conversão.';
+    const estimatedRate = (revenue / averageCommission / clicks) * 100;
+    return `Taxa de conversão estimada: ${estimatedRate.toFixed(2)}%, assumindo comissão média de ${formatCurrency(averageCommission)} por venda. Essa estimativa não substitui dados reais de conversão da Amazon.`;
+  }
+
+  if (question.includes('anime') && (question.includes('clic') || question.includes('convert'))) {
+    const topAnime = metrics.topAnimes?.[0];
+    return topAnime
+      ? `${topAnime.animeTitulo} é o anime com mais cliques: ${topAnime.clicks}. Lembre-se: cliques não confirmam compras.`
+      : 'Ainda não há cliques de afiliado registrados para comparar os animes.';
+  }
+
+  if (question.includes('tiktok')) {
+    const share = clicks > 0 ? (tiktokClicks / clicks) * 100 : 0;
+    const recommendation = tiktokClicks === 0
+      ? 'Use links com ?utm_source=tiktok nas próximas publicações para separar esse tráfego.'
+      : `TikTok representa ${share.toFixed(1)}% dos cliques (${tiktokClicks}). Compare o EPC desse tráfego com o orgânico antes de aumentar o investimento.`;
+    return `${recommendation} Teste criativos e chamadas diferentes com UTMs distintas; aumente o orçamento gradualmente somente quando a receita atribuída superar os custos.`;
+  }
+
+  if (question.includes('1000') || question.includes('mil cliques') || question.includes('projet')) {
+    return clicks > 0
+      ? `Com o EPC atual de ${formatCurrency(epc)}, 1.000 cliques projetariam ${formatCurrency(epc * 1000)} em receita bruta. É uma projeção linear, não uma garantia de ganhos.`
+      : 'Ainda não há cliques ou receita suficientes para projetar ganhos. Registre cliques e receitas para calcular o EPC.';
+  }
+
+  const topAnime = metrics.topAnimes?.[0];
+  return `Resumo atual: ${clicks} cliques, ${tiktokClicks} via TikTok, ${formatCurrency(revenue)} em receitas e ${formatCurrency(costs)} em custos. EPC: ${formatCurrency(epc)}.${topAnime ? ` Anime mais clicado: ${topAnime.animeTitulo} (${topAnime.clicks}).` : ''}`;
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return sendJson(res, 405, { error: 'Método não permitido.' });
+  }
+  if (!requireAdmin(req, res)) return;
+
+  let body;
+  try {
+    body = getRequestBody(req);
+  } catch {
+    return sendJson(res, 400, { error: 'Corpo da requisição inválido.' });
+  }
+  const message = typeof body.message === 'string' ? body.message.trim().slice(0, 500) : '';
+  if (!message) return sendJson(res, 400, { error: 'Escreva uma pergunta ou comando.' });
+
+  try {
+    const supabase = createAdminSupabase();
+    const movement = parseFinanceCommand(message);
+    if (/^\s*registrar\s+(receita|gasto|despesa)\b/i.test(message)) {
+      if (!movement) {
+        return sendJson(res, 400, { error: 'Use: registrar receita 150 comissão Amazon ou registrar gasto 50 TikTok Ads.' });
+      }
+      const saved = await createFinanceMovement(supabase, movement);
+      const metrics = await readDashboardMetrics(supabase);
+      return sendJson(res, 200, {
+        movementRegistered: true,
+        movement: saved,
+        reply: `${movement.tipo === 'receita' ? 'Receita' : 'Despesa'} de ${formatCurrency(movement.valor)} registrada: ${movement.descricao}. Os indicadores já foram atualizados.`,
+        metrics,
+      });
+    }
+
+    const metrics = await readDashboardMetrics(supabase);
+    const averageCommission = Number(body.averageCommission);
+    const safeAverageCommission = Number.isFinite(averageCommission) && averageCommission > 0
+      ? averageCommission
+      : 0;
+    return sendJson(res, 200, {
+      movementRegistered: false,
+      reply: makeAnswer(message, metrics, safeAverageCommission),
+    });
+  } catch (error) {
+    logApiError('Falha no chat financeiro', error);
+    return sendJson(res, 500, { error: 'Não foi possível consultar os dados financeiros.' });
+  }
+}

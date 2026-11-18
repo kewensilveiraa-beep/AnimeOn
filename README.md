@@ -14,8 +14,8 @@ da AniList (`https://graphql.anilist.co`).
 - Catálogo por categoria, busca com debounce e paginação progressiva de 30
   títulos por lote.
 - Lista pessoal e progresso de episódios persistidos no `localStorage`.
-- Detalhes, trailer do YouTube, serviços oficiais informados pela AniList e
-  busca de produtos na Amazon Brasil.
+- Detalhes, trailer do YouTube, links afiliados da Amazon Brasil e
+  rastreamento de cliques por anime e origem.
 - O app não transmite episódios completos. O rastreador registra o progresso;
   trailers e links oficiais são recursos separados.
 
@@ -31,3 +31,32 @@ npm run dev
 As URLs e identificadores ficam centralizados em `src/config/afiliados.js`.
 A Amazon Brasil usa a tag aprovada `animeon09-20` nos links da Crunchyroll via
 Prime Video Channels, do Prime Video e da loja de mangás e colecionáveis.
+
+## Supabase e painel administrativo
+
+1. Copie `.env.example` para `.env.local` para desenvolvimento local. O
+   `.env.local` já está ignorado pelo Git; nunca versione chaves privadas.
+2. No SQL Editor do Supabase, execute `supabase/schema.sql`. A tabela de cliques
+   permite `INSERT` anônimo validado pela tag, mas não permite leitura ou edição
+   pública. Dados financeiros e métricas são acessíveis somente pelas funções
+   de servidor.
+3. Na Vercel, configure estas variáveis em todos os ambientes usados:
+
+   - `VITE_SUPABASE_URL`: URL do projeto Supabase.
+   - `VITE_SUPABASE_ANON_KEY`: chave publishable/anon do projeto.
+   - `ADMIN_PIN`: PIN administrativo forte, definido apenas no servidor.
+   - `ADMIN_SESSION_SECRET`: segredo aleatório com pelo menos 32 caracteres.
+   - `SUPABASE_SERVICE_ROLE_KEY`: chave service role, somente no servidor.
+
+   Gere o segredo de sessão com
+   `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+   Não use o prefixo `VITE_` em `ADMIN_PIN`, `ADMIN_SESSION_SECRET` ou
+   `SUPABASE_SERVICE_ROLE_KEY`; ele exporia esses valores ao navegador.
+4. Faça um novo deploy da Vercel. O painel fica em `/admin`. Para testar as
+   funções serverless localmente, use `vercel dev`; `npm run dev` inicia apenas
+   o servidor Vite.
+
+O painel atualiza as métricas a cada 20 segundos. O chat responde com regras
+determinísticas sobre os dados do Supabase; a taxa de conversão é uma estimativa
+com base na receita registrada, cliques e comissão média informada, não um dado
+real de conversão fornecido pela Amazon.

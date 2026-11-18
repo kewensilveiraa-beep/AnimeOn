@@ -4,6 +4,8 @@ import {
   getLinkCrunchyroll,
   getLinkPrimeVideo,
 } from './config/afiliados.js';
+import AdminPanel from './AdminPanel.jsx';
+import { registrarCliqueAfiliado } from './lib/supabase.js';
 import './App.css';
 
 const ANILIST_API = 'https://graphql.anilist.co';
@@ -15,6 +17,30 @@ const CATEGORIES = [
   { id: 'top', label: 'Melhores Avaliados', sort: ['SCORE_DESC'] },
   { id: 'upcoming', label: 'Em Breve', sort: ['POPULARITY_DESC'] },
 ];
+
+function trackAffiliateClick(click) {
+  void registrarCliqueAfiliado(click).catch((error) => {
+    console.error('Não foi possível registrar o clique de afiliado.', error);
+  });
+}
+
+function isAdminRoute() {
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const hashRoute = window.location.hash.replace(/^#/, '').replace(/\/+$/, '');
+  return pathname === '/admin' || hashRoute === '/admin';
+}
+
+function captureTrafficOrigin() {
+  const params = new URLSearchParams(window.location.search);
+  const queryOrigin = params.get('utm_source') || params.get('ref');
+  const existingOrigin = window.sessionStorage.getItem('origem_trafego');
+  const origin = (queryOrigin || existingOrigin || 'direto')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '')
+    .slice(0, 100) || 'direto';
+  window.sessionStorage.setItem('origem_trafego', origin);
+}
 
 const ANILIST_QUERY = `
   query (
@@ -552,6 +578,7 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
     ? Math.min(100, Math.round((watched.length / episodeTotal) * 100))
     : 0;
   const studio = anime.studios?.nodes?.[0]?.name;
+  const mangaUrl = getLinkAmazonManga(title);
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
   const trailerSearch = trailerLanguage === 'dubbed'
     ? `${title} trailer dublado portugues`
@@ -560,8 +587,18 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
     ? (trailerId ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}` : null)
     : `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(trailerSearch)}`;
   const configuredLinks = [
-    { id: 'crunchyroll-channel', site: 'Crunchyroll via Prime Video Channels', url: getLinkCrunchyroll() },
-    { id: 'prime-video', site: 'Amazon Prime Video', url: getLinkPrimeVideo() },
+    {
+      id: 'crunchyroll-channel',
+      site: 'Crunchyroll via Prime Video Channels',
+      tipoLink: 'crunchyroll',
+      url: getLinkCrunchyroll(),
+    },
+    {
+      id: 'prime-video',
+      site: 'Amazon Prime Video',
+      tipoLink: 'prime_video',
+      url: getLinkPrimeVideo(),
+    },
   ];
   const durationLabel = anime.duration ? `${anime.duration} min por episódio` : 'Duração não informada';
   const year = anime.startDate?.year || anime.seasonYear || 'Ano não informado';
@@ -640,7 +677,12 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
             <div className="episode-cta">
               <a
                 className="button-secondary manga-cta conversion-cta"
-                href={getLinkAmazonManga(title)}
+                href={mangaUrl}
+                onClick={() => trackAffiliateClick({
+                  animeTitulo: title,
+                  tipoLink: 'manga',
+                  urlDestino: mangaUrl,
+                })}
                 target="_blank"
                 rel="sponsored noopener noreferrer"
               >
@@ -708,6 +750,11 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
                 <a
                   className="service-link conversion-cta"
                   href={link.url}
+                  onClick={() => trackAffiliateClick({
+                    animeTitulo: title,
+                    tipoLink: link.tipoLink,
+                    urlDestino: link.url,
+                  })}
                   key={link.id || link.url}
                   target="_blank"
                   rel="sponsored noopener noreferrer"
@@ -728,7 +775,7 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
   );
 }
 
-function App() {
+function AnimeOnApp() {
   const [animeList, setAnimeList] = useState([]);
   const [trendingHighlights, setTrendingHighlights] = useState([]);
   const [trendingError, setTrendingError] = useState('');
@@ -1168,6 +1215,23 @@ function App() {
       )}
     </div>
   );
+}
+
+function App() {
+  const [adminRoute, setAdminRoute] = useState(isAdminRoute);
+
+  useEffect(() => {
+    captureTrafficOrigin();
+    const updateRoute = () => setAdminRoute(isAdminRoute());
+    window.addEventListener('popstate', updateRoute);
+    window.addEventListener('hashchange', updateRoute);
+    return () => {
+      window.removeEventListener('popstate', updateRoute);
+      window.removeEventListener('hashchange', updateRoute);
+    };
+  }, []);
+
+  return adminRoute ? <AdminPanel /> : <AnimeOnApp />;
 }
 
 export default App;
