@@ -29,6 +29,5 @@ npm run dev
 ## Links de parceiros
 
 As URLs e identificadores ficam centralizados em `src/config/afiliados.js`.
-Os valores `animeon-20` são placeholders: substitua-os pelas tags aprovadas
-antes de publicar links de afiliados. A base da Crunchyroll também pode ser
-substituída por um deep link de parceiro quando disponível.
+A Amazon Brasil usa a tag aprovada `animeon09-20` nos links da Crunchyroll via
+Prime Video Channels, do Prime Video e da loja de mangás e colecionáveis.

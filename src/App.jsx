@@ -78,13 +78,6 @@ const ANILIST_QUERY = `
           id
           site
         }
-        externalLinks {
-          id
-          site
-          url
-          type
-          language
-        }
       }
     }
   }
@@ -206,7 +199,6 @@ function normalizeSavedAnime(anime) {
     description: anime?.description || anime?.synopsis || '',
     genres: (anime?.genres || []).map((genre) => (typeof genre === 'string' ? genre : genre.name)),
     studios: anime?.studios || { nodes: [] },
-    externalLinks: anime?.externalLinks || [],
     duration: anime?.duration || 24,
   };
 }
@@ -336,15 +328,6 @@ function formatCountdown(seconds) {
   const hours = Math.floor((remaining % 86400) / 3600);
   const minutes = Math.floor((remaining % 3600) / 60);
   return days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}min`;
-}
-
-function getSafeUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
-  } catch {
-    return null;
-  }
 }
 
 function AnimeCard({ anime, progress, isSaved, onOpen, onToggleSaved }) {
@@ -561,6 +544,7 @@ function FeaturedHero({ animes, savedIds, trendingError, onOpen, onToggleSaved }
 }
 
 function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
+  const [trailerLanguage, setTrailerLanguage] = useState('original');
   const title = getAnimeTitle(anime);
   const watched = progress[String(anime.id)]?.watched || [];
   const episodeTotal = getReleasedEpisodeCount(anime);
@@ -569,23 +553,16 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
     : 0;
   const studio = anime.studios?.nodes?.[0]?.name;
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
-  const trailerUrl = trailerId
-    ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}`
-    : null;
+  const trailerSearch = trailerLanguage === 'dubbed'
+    ? `${title} trailer dublado portugues`
+    : `${title} trailer legendado pt br`;
+  const trailerUrl = trailerLanguage === 'original'
+    ? (trailerId ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}` : null)
+    : `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(trailerSearch)}`;
   const configuredLinks = [
-    { id: 'crunchyroll-search', site: 'Crunchyroll', url: getLinkCrunchyroll(title) },
-    { id: 'prime-video-search', site: 'Prime Video', url: getLinkPrimeVideo(title) },
+    { id: 'crunchyroll-channel', site: 'Crunchyroll via Prime Video Channels', url: getLinkCrunchyroll() },
+    { id: 'prime-video', site: 'Amazon Prime Video', url: getLinkPrimeVideo() },
   ];
-  const configuredSites = new Set(configuredLinks.map((link) => link.site.toLowerCase()));
-  const streamingLinks = [
-    ...configuredLinks,
-    ...(anime.externalLinks || [])
-      .filter((link) => link.type === 'STREAMING'
-        && !configuredSites.has((link.site || '').toLowerCase()))
-      .map((link) => ({ ...link, safeUrl: getSafeUrl(link.url) })),
-  ]
-    .map((link) => ({ ...link, safeUrl: link.safeUrl || getSafeUrl(link.url) }))
-    .filter((link) => link.safeUrl);
   const durationLabel = anime.duration ? `${anime.duration} min por episódio` : 'Duração não informada';
   const year = anime.startDate?.year || anime.seasonYear || 'Ano não informado';
 
@@ -662,12 +639,13 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
             )}
             <div className="episode-cta">
               <a
-                className="button-secondary manga-cta"
+                className="button-secondary manga-cta conversion-cta"
                 href={getLinkAmazonManga(title)}
                 target="_blank"
                 rel="sponsored noopener noreferrer"
               >
                 Continuar a história no Mangá Oficial
+                <span className="conversion-badge">MANGÁ OFICIAL</span>
                 <Icon name="external" size={16} />
               </a>
               <p className="affiliate-disclosure">
@@ -683,9 +661,28 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
                 <h3>Trailer</h3>
               </div>
             </div>
+            <div className="trailer-options" role="group" aria-label="Idioma do trailer">
+              <button
+                className={`trailer-option ${trailerLanguage === 'dubbed' ? 'is-selected' : ''}`}
+                type="button"
+                aria-pressed={trailerLanguage === 'dubbed'}
+                onClick={() => setTrailerLanguage((current) => (current === 'dubbed' ? 'original' : 'dubbed'))}
+              >
+                🇧🇷 Dublado (PT-BR)
+              </button>
+              <button
+                className={`trailer-option ${trailerLanguage === 'subbed' ? 'is-selected' : ''}`}
+                type="button"
+                aria-pressed={trailerLanguage === 'subbed'}
+                onClick={() => setTrailerLanguage((current) => (current === 'subbed' ? 'original' : 'subbed'))}
+              >
+                💬 Legendado (PT-BR)
+              </button>
+            </div>
             {trailerUrl ? (
               <div className="trailer-frame">
                 <iframe
+                  key={trailerUrl}
                   src={trailerUrl}
                   title={`Trailer de ${title}`}
                   loading="lazy"
@@ -703,25 +700,26 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Descoberta e coleção</p>
-                <h3>Onde Assistir e Colecionáveis</h3>
+                <h3>Onde Assistir</h3>
               </div>
             </div>
             <div className="link-list">
-              {streamingLinks.map((link) => (
+              {configuredLinks.map((link) => (
                 <a
-                  className="service-link"
-                  href={link.safeUrl}
+                  className="service-link conversion-cta"
+                  href={link.url}
                   key={link.id || link.url}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="sponsored noopener noreferrer"
                 >
                   {link.site}
+                  <span className="conversion-badge">ASSINAR AGORA</span>
                   <Icon name="external" size={16} />
                 </a>
               ))}
             </div>
             <p className="empty-note">
-              Os links levam às páginas de busca dos serviços; catálogo e disponibilidade podem variar por região.
+              Canais oficiais de afiliado da Amazon; catálogo e disponibilidade podem variar por região.
             </p>
           </section>
         </div>

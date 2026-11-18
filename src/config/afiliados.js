@@ -1,19 +1,15 @@
 export const AFILIADOS_CONFIG = {
-  amazonTag: 'animeon-20',
-  crunchyrollBaseUrl: 'https://www.crunchyroll.com/pt-br/search?q=',
-  primeVideoTag: 'animeon-20',
+  amazonEnabled: true,
+  amazonTag: 'animeon09-20',
+  crunchyrollBenefitId: 'crunchyrollbr',
 };
 
-export function getLinkCrunchyroll(titulo) {
-  return `${AFILIADOS_CONFIG.crunchyrollBaseUrl}${encodeURIComponent(titulo.trim())}`;
+export function getLinkCrunchyroll() {
+  return `https://www.amazon.com.br/gp/video/storefront?benefitId=${AFILIADOS_CONFIG.crunchyrollBenefitId}&tag=${AFILIADOS_CONFIG.amazonTag}`;
 }
 
-export function getLinkPrimeVideo(titulo) {
-  const search = new URLSearchParams({
-    phrase: titulo.trim(),
-    tag: AFILIADOS_CONFIG.primeVideoTag,
-  });
-  return `https://www.primevideo.com/search?${search.toString()}`;
+export function getLinkPrimeVideo() {
+  return `https://www.amazon.com.br/gp/video/storefront?tag=${AFILIADOS_CONFIG.amazonTag}`;
 }
 
 export function getLinkAmazonManga(titulo) {
