@@ -18,13 +18,108 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+function parseCurrencyNumber(value) {
+  return Number(
+    value.includes(',')
+      ? value.replace(/\./g, '').replace(',', '.')
+      : value,
+  );
+}
+
 function parseFinanceCommand(message) {
-  const match = message.match(/^\s*registrar\s+(receita|gasto|despesa)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(.*)$/i);
+  const match = message.match(/^\s*registrar\s+(receita|gasto|despesa)\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(.*)$/i);
   if (!match) return null;
   const tipo = match[1].toLowerCase() === 'receita' ? 'receita' : 'despesa';
-  const valor = Number(match[2].replace(',', '.'));
+  const valor = parseCurrencyNumber(match[2]);
   const descricao = match[3].trim() || (tipo === 'receita' ? 'Receita registrada pelo chat' : 'Despesa registrada pelo chat');
   return normalizeFinanceMovement({ tipo, valor, descricao });
+}
+
+function parseGeminiResponse(payload) {
+  const text = payload?.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || '')
+    .join('')
+    .trim();
+  if (!text) return null;
+
+  try {
+    const result = JSON.parse(text);
+    if (typeof result.reply !== 'string' || !result.reply.trim()) return null;
+    return {
+      reply: result.reply.trim().slice(0, 3000),
+      movement: normalizeFinanceMovement(result.movement),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getExplicitMovementDetails(message) {
+  const normalized = normalizeQuestion(message);
+  if (!/\b(registr|lanc|adicion|inclu|anot|cadastr)/.test(normalized)) return null;
+
+  const typeMatch = normalized.match(/\b(receita|despesa|gasto|custo)\b/);
+  const amountMatch = message.match(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[,.]\d{1,2})?)/i);
+  if (!typeMatch || !amountMatch) return null;
+
+  const amount = parseCurrencyNumber(amountMatch[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  return {
+    tipo: typeMatch[1] === 'receita' ? 'receita' : 'despesa',
+    valor: amount,
+  };
+}
+
+async function askGemini(message, context) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{
+              text: [
+                'Você é o analista financeiro do AnimeOn, um site de afiliados Amazon Brasil com a tag animeon09-20.',
+                'Responda de forma objetiva, sempre em português, usando somente os dados fornecidos; não invente métricas nem trate cliques como vendas.',
+                'Se o usuário solicitar explicitamente registrar uma receita ou despesa e informar o valor, devolva movement com tipo (receita ou despesa), valor numérico e uma descrição curta.',
+                'Não proponha um lançamento quando o usuário apenas perguntar sobre receitas ou despesas. Não alegue que um lançamento foi salvo.',
+                'Retorne exclusivamente JSON válido no formato {"reply":"resposta","movement":null} ou {"reply":"resposta","movement":{"tipo":"receita|despesa","valor":0,"descricao":"..."}}.',
+              ].join(' '),
+            }],
+          },
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `Contexto atualizado do Supabase:\n${JSON.stringify(context)}\n\nMensagem do usuário:\n${message}`,
+            }],
+          }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini respondeu com status ${response.status}.`);
+    }
+
+    const result = parseGeminiResponse(await response.json());
+    if (!result) throw new Error('Gemini retornou uma resposta em formato inválido.');
+    return result;
+  } catch (error) {
+    logApiError('Gemini indisponível; usando o chat por regras', error);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function normalizeQuestion(value) {
@@ -121,6 +216,39 @@ export default async function handler(req, res) {
     const safeAverageCommission = Number.isFinite(averageCommission) && averageCommission > 0
       ? averageCommission
       : 0;
+    const context = {
+      totalClicks: toNumber(metrics.totalClicks),
+      tiktokClicks: toNumber(metrics.tiktokClicks),
+      topAnimes: metrics.topAnimes || [],
+      revenue: toNumber(metrics.revenue),
+      expenses: toNumber(metrics.costs),
+      balance: toNumber(metrics.revenue) - toNumber(metrics.costs),
+      averageCommission: safeAverageCommission,
+    };
+    const geminiAnswer = await askGemini(message, context);
+    if (geminiAnswer) {
+      const requestedMovement = getExplicitMovementDetails(message);
+      const suggestedMovement = geminiAnswer.movement;
+      if (requestedMovement
+        && suggestedMovement
+        && suggestedMovement.tipo === requestedMovement.tipo
+        && suggestedMovement.valor === requestedMovement.valor) {
+        const saved = await createFinanceMovement(supabase, suggestedMovement);
+        const updatedMetrics = await readDashboardMetrics(supabase);
+        return sendJson(res, 200, {
+          movementRegistered: true,
+          movement: saved,
+          reply: `${suggestedMovement.tipo === 'receita' ? 'Receita' : 'Despesa'} de ${formatCurrency(suggestedMovement.valor)} registrada: ${suggestedMovement.descricao}. Os indicadores já foram atualizados.`,
+          metrics: updatedMetrics,
+        });
+      }
+
+      return sendJson(res, 200, {
+        movementRegistered: false,
+        reply: geminiAnswer.reply,
+      });
+    }
+
     return sendJson(res, 200, {
       movementRegistered: false,
       reply: makeAnswer(message, metrics, safeAverageCommission),

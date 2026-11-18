@@ -244,6 +244,7 @@ export default function AdminPanel() {
     try {
       const result = await requestApi('/api/admin/chat', {
         method: 'POST',
+        credentials: 'include',
         body: JSON.stringify({
           message,
           averageCommission: commissionValue,
@@ -535,7 +536,7 @@ export default function AdminPanel() {
           {chatMessages.map((message, index) => (
             <ChatBubble key={`${message.role}-${index}`} message={message} />
           ))}
-          {chatBusy && <p className="admin-chat-loading">Consultando os dados…</p>}
+          {chatBusy && <p className="admin-chat-loading">Analisando…</p>}
           <div ref={chatEndRef} />
         </div>
         {chatError && <p className="admin-error" role="alert">{chatError}</p>}

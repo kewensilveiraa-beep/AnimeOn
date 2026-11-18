@@ -47,6 +47,7 @@ Prime Video Channels, do Prime Video e da loja de mangás e colecionáveis.
    - `ADMIN_PIN`: PIN administrativo forte, definido apenas no servidor.
    - `ADMIN_SESSION_SECRET`: segredo aleatório com pelo menos 32 caracteres.
    - `SUPABASE_SERVICE_ROLE_KEY`: chave service role, somente no servidor.
+   - `GEMINI_API_KEY`: chave da API Gemini, somente no servidor; sem ela ou se a API estiver indisponível, o chat usa as respostas locais por regras.
 
    Gere o segredo de sessão com
    `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
@@ -56,7 +57,8 @@ Prime Video Channels, do Prime Video e da loja de mangás e colecionáveis.
    funções serverless localmente, use `vercel dev`; `npm run dev` inicia apenas
    o servidor Vite.
 
-O painel atualiza as métricas a cada 20 segundos. O chat responde com regras
-determinísticas sobre os dados do Supabase; a taxa de conversão é uma estimativa
-com base na receita registrada, cliques e comissão média informada, não um dado
-real de conversão fornecido pela Amazon.
+O painel atualiza as métricas a cada 20 segundos. O chat usa o Gemini para
+analisar os dados atualizados do Supabase e mantém respostas locais por regras
+como fallback. A taxa de conversão é uma estimativa com base na receita
+registrada, cliques e comissão média informada, não um dado real de conversão
+fornecido pela Amazon.
