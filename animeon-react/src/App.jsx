@@ -451,7 +451,12 @@ function FeaturedHero({ animes, savedIds, trendingError, onOpen, onToggleSaved }
 
   const image = anime.bannerImage || getCover(anime);
   const synopsis = stripHtml(anime.description || '');
-  const title = getAnimeTitle(anime);
+  const fullTitle = getAnimeTitle(anime);
+  const englishTitle = anime.title?.english;
+  const romajiTitle = anime.title?.romaji;
+  const title = romajiTitle?.length > 55
+    ? (englishTitle || romajiTitle)
+    : fullTitle;
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
   const trailerUrl = trailerId
     ? `https://www.youtube.com/embed/${encodeURIComponent(trailerId)}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&loop=1&playlist=${encodeURIComponent(trailerId)}&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3`
@@ -499,7 +504,12 @@ function FeaturedHero({ animes, savedIds, trendingError, onOpen, onToggleSaved }
             {trendingError}
           </p>
         )}
-        <h1>{title}</h1>
+        <h1
+          className={title.length > 40 ? 'is-long-title' : ''}
+          title={fullTitle}
+        >
+          {title}
+        </h1>
         <div className="hero-meta">
           {anime.averageScore && (
             <span className="hero-score">
