@@ -1,7 +1,6 @@
 export const AFILIADOS_CONFIG = {
   amazonEnabled: true,
   amazonTag: 'animeon09-20',
-  crunchyrollBenefitId: 'crunchyrollbr',
 };
 
 /**
@@ -16,26 +15,11 @@ function limparTituloParaBusca(titulo = '') {
     .trim();
 }
 
-export function getLinkCrunchyroll(titulo = '') {
-  const tituloLimpo = limparTituloParaBusca(titulo);
-  const params = new URLSearchParams({
-    k: tituloLimpo ? `${tituloLimpo} Crunchyroll` : 'Crunchyroll Prime Video Channel',
-    i: 'instant-video',
-    tag: AFILIADOS_CONFIG.amazonTag,
-  });
-  return `https://www.amazon.com.br/s?${params.toString()}`;
+export function getLinkCrunchyroll() {
+  return `https://www.amazon.com.br/gp/video/primesignup?tag=${AFILIADOS_CONFIG.amazonTag}`;
 }
 
-export function getLinkPrimeVideo(titulo = '') {
-  const tituloLimpo = limparTituloParaBusca(titulo);
-  if (tituloLimpo) {
-    const params = new URLSearchParams({
-      k: tituloLimpo,
-      i: 'instant-video',
-      tag: AFILIADOS_CONFIG.amazonTag,
-    });
-    return `https://www.amazon.com.br/s?${params.toString()}`;
-  }
+export function getLinkPrimeVideo() {
   return `https://www.amazon.com.br/gp/video/primesignup?tag=${AFILIADOS_CONFIG.amazonTag}`;
 }
 

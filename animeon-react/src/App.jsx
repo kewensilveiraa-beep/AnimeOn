@@ -572,13 +572,14 @@ function FeaturedHero({ animes, savedIds, trendingError, onOpen, onToggleSaved }
 function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
   const [trailerLanguage, setTrailerLanguage] = useState('original');
   const title = getAnimeTitle(anime);
+  const searchTitle = anime.title?.english || title;
   const watched = progress[String(anime.id)]?.watched || [];
   const episodeTotal = getReleasedEpisodeCount(anime);
   const percentage = episodeTotal > 0
     ? Math.min(100, Math.round((watched.length / episodeTotal) * 100))
     : 0;
   const studio = anime.studios?.nodes?.[0]?.name;
-  const mangaUrl = getLinkAmazonManga(title);
+  const mangaUrl = getLinkAmazonManga(searchTitle);
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
   const trailerUrl = trailerId
     ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}${trailerLanguage === 'subbed' ? '?cc_load_policy=1&cc_lang_pref=pt&hl=pt' : ''}`
@@ -588,13 +589,13 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
       id: 'crunchyroll-channel',
       site: 'Crunchyroll via Prime Video Channels',
       tipoLink: 'crunchyroll',
-      url: getLinkCrunchyroll(title),
+      url: getLinkCrunchyroll(),
     },
     {
       id: 'prime-video',
       site: 'Amazon Prime Video',
       tipoLink: 'prime_video',
-      url: getLinkPrimeVideo(title),
+      url: getLinkPrimeVideo(),
     },
   ];
   const durationLabel = anime.duration ? `${anime.duration} min por episódio` : 'Duração não informada';
