@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getLinkAmazonManga,
   getLinkCrunchyroll,
-  getLinkPrimeVideo,
 } from './config/afiliados.js';
 import AdminPanel from './AdminPanel.jsx';
 import { registrarCliqueAfiliado } from './lib/supabase.js';
@@ -580,24 +579,11 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
     : 0;
   const studio = anime.studios?.nodes?.[0]?.name;
   const mangaUrl = getLinkAmazonManga(searchTitle);
+  const crunchyrollUrl = import.meta.env.VITE_CRUNCHYROLL_AFFILIATE_URL || getLinkCrunchyroll();
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
   const trailerUrl = trailerId
     ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}${trailerLanguage === 'subbed' ? '?cc_load_policy=1&cc_lang_pref=pt&hl=pt' : ''}`
     : null;
-  const configuredLinks = [
-    {
-      id: 'crunchyroll-channel',
-      site: 'Crunchyroll via Prime Video Channels',
-      tipoLink: 'crunchyroll',
-      url: getLinkCrunchyroll(),
-    },
-    {
-      id: 'prime-video',
-      site: 'Amazon Prime Video',
-      tipoLink: 'prime_video',
-      url: getLinkPrimeVideo(),
-    },
-  ];
   const durationLabel = anime.duration ? `${anime.duration} min por episódio` : 'Duração não informada';
   const year = anime.startDate?.year || anime.seasonYear || 'Ano não informado';
 
@@ -744,27 +730,24 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
               </div>
             </div>
             <div className="link-list">
-              {configuredLinks.map((link) => (
-                <a
-                  className="service-link conversion-cta"
-                  href={link.url}
-                  onClick={() => trackAffiliateClick({
-                    animeTitulo: title,
-                    tipoLink: link.tipoLink,
-                    urlDestino: link.url,
-                  })}
-                  key={link.id || link.url}
-                  target="_blank"
-                  rel="sponsored noopener noreferrer"
-                >
-                  {link.site}
-                  <span className="conversion-badge">ASSINAR AGORA</span>
-                  <Icon name="external" size={16} />
-                </a>
-              ))}
+              <a
+                className="service-link conversion-cta"
+                href={crunchyrollUrl}
+                onClick={() => trackAffiliateClick({
+                  animeTitulo: title,
+                  tipoLink: 'crunchyroll',
+                  urlDestino: crunchyrollUrl,
+                })}
+                target="_blank"
+                rel="sponsored noopener noreferrer"
+              >
+                Assistir na Crunchyroll
+                <span className="conversion-badge">TESTE GRÁTIS</span>
+                <Icon name="external" size={16} />
+              </a>
             </div>
             <p className="empty-note">
-              Canais oficiais de afiliado da Amazon; catálogo e disponibilidade podem variar por região.
+              Link oficial de parceiro Crunchyroll; catálogo e disponibilidade podem variar por região.
             </p>
           </section>
         </div>
