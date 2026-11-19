@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getLinkAmazonManga,
-  getLinkCrunchyroll,
 } from './config/afiliados.js';
 import AdminPanel from './AdminPanel.jsx';
 import { registrarCliqueAfiliado } from './lib/supabase.js';
@@ -579,7 +578,7 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
     : 0;
   const studio = anime.studios?.nodes?.[0]?.name;
   const mangaUrl = getLinkAmazonManga(searchTitle);
-  const crunchyrollUrl = import.meta.env.VITE_CRUNCHYROLL_AFFILIATE_URL || getLinkCrunchyroll();
+  const crunchyrollUrl = import.meta.env.VITE_CRUNCHYROLL_AFFILIATE_URL || 'https://www.crunchyroll.com/pt-br/';
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
   const trailerUrl = trailerId
     ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}${trailerLanguage === 'subbed' ? '?cc_load_policy=1&cc_lang_pref=pt&hl=pt' : ''}`
