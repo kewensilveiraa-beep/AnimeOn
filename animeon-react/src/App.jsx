@@ -580,12 +580,9 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
   const studio = anime.studios?.nodes?.[0]?.name;
   const mangaUrl = getLinkAmazonManga(title);
   const trailerId = anime.trailer?.site?.toLowerCase() === 'youtube' ? anime.trailer.id : null;
-  const trailerSearch = trailerLanguage === 'dubbed'
-    ? `${title} trailer dublado portugues`
-    : `${title} trailer legendado pt br`;
-  const trailerUrl = trailerLanguage === 'original'
-    ? (trailerId ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}` : null)
-    : `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(trailerSearch)}`;
+  const trailerUrl = trailerId
+    ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailerId)}${trailerLanguage === 'subbed' ? '?cc_load_policy=1&cc_lang_pref=pt&hl=pt' : ''}`
+    : null;
   const configuredLinks = [
     {
       id: 'crunchyroll-channel',
@@ -704,14 +701,14 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
               </div>
             </div>
             <div className="trailer-options" role="group" aria-label="Idioma do trailer">
-              <button
-                className={`trailer-option ${trailerLanguage === 'dubbed' ? 'is-selected' : ''}`}
-                type="button"
-                aria-pressed={trailerLanguage === 'dubbed'}
-                onClick={() => setTrailerLanguage((current) => (current === 'dubbed' ? 'original' : 'dubbed'))}
+              <a
+                className="trailer-option"
+                href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} trailer dublado pt br`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                🇧🇷 Dublado (PT-BR)
-              </button>
+                🇧🇷 Buscar Dublado (YouTube)
+              </a>
               <button
                 className={`trailer-option ${trailerLanguage === 'subbed' ? 'is-selected' : ''}`}
                 type="button"
