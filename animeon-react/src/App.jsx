@@ -591,13 +591,13 @@ function AnimeDetailsModal({ anime, progress, onClose, onToggleEpisode }) {
       id: 'crunchyroll-channel',
       site: 'Crunchyroll via Prime Video Channels',
       tipoLink: 'crunchyroll',
-      url: getLinkCrunchyroll(),
+      url: getLinkCrunchyroll(title),
     },
     {
       id: 'prime-video',
       site: 'Amazon Prime Video',
       tipoLink: 'prime_video',
-      url: getLinkPrimeVideo(),
+      url: getLinkPrimeVideo(title),
     },
   ];
   const durationLabel = anime.duration ? `${anime.duration} min por episódio` : 'Duração não informada';
